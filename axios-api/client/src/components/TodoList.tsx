@@ -23,7 +23,6 @@ export default function TodoList() {
 
   const [filter, setFilter] = useState<"all" | "completed" | "active">("all");
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
 
   const loadTasks = async () => {
     try {
@@ -92,15 +91,21 @@ export default function TodoList() {
       setLoading(false);
     }
   };
-  
-  const uncheckTask = async (task: Task) => {
+
+  const handleTaskToggle = async (task: Task) => {
     try {
       setLoading(true);
-      const updatedTask = { ...task, completed: false };
+      const updatedTask = { ...task, completed: !task.completed };
       await axios.put(`http://localhost:3000/tasks/${task.id}`, updatedTask);
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
-    } catch (err) {
-      console.log("Uncheck failed:", err);
+
+      const newTasks = tasks.map((t) => (t.id === task.id ? updatedTask : t));
+      setTasks(newTasks);
+
+      if (newTasks.length > 0 && newTasks.every((t) => t.completed)) {
+        setShowCompleteModal(true);
+      }
+    } catch (error) {
+      console.log("Toggle task failed:", error);
     } finally {
       setLoading(false);
     }
@@ -111,23 +116,6 @@ export default function TodoList() {
     setEditTitle(task.title);
     setShowEditModal(true);
   };
-
-  const confirmComplete = async () => {
-  if (!taskToComplete) return;
-  try {
-    setLoading(true);
-    const updatedTask = { ...taskToComplete, completed: !taskToComplete.completed };
-    await axios.put(`http://localhost:3000/tasks/${taskToComplete.id}`, updatedTask);
-    setTasks(tasks.map((t) => (t.id === taskToComplete.id ? updatedTask : t)));
-  } catch (error) {
-    console.log("Complete task failed:", error);
-  } finally {
-    setShowCompleteModal(false);
-    setTaskToComplete(null);
-    setLoading(false);
-  }
-};
-
 
   const confirmEdit = async () => {
     if (!taskToEdit) return;
@@ -162,7 +150,6 @@ export default function TodoList() {
     }
   };
 
-
   useEffect(() => {
     loadTasks();
   }, []);
@@ -170,7 +157,7 @@ export default function TodoList() {
   const filteredTasks = tasks.filter((task) => {
     if (filter === "completed") return task.completed;
     if (filter === "active") return !task.completed;
-    return true; // "all"
+    return true;
   });
 
   return (
@@ -241,16 +228,7 @@ export default function TodoList() {
                     className="form-check-input me-2"
                     type="checkbox"
                     checked={task.completed}
-                    onChange={() => {
-                      if (!task.completed) {
-                        // only show modal when marking as completed
-                        setTaskToComplete(task);
-                        setShowCompleteModal(true);
-                      } else {
-                        // if currently completed and user unchecks -> update directly
-                        uncheckTask(task);
-                      }
-                    }}
+                    onChange={() => handleTaskToggle(task)}
                   />
                   {task.completed ? <s>{task.title}</s> : task.title}
                 </div>
@@ -418,15 +396,9 @@ export default function TodoList() {
               </div>
               <div className="modal-footer justify-content-center">
                 <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowCompleteModal(false);
-                    setTaskToComplete(null);
-                  }}
+                  className="btn btn-success"
+                  onClick={() => setShowCompleteModal(false)}
                 >
-                  Hủy
-                </button>
-                <button className="btn btn-success" onClick={confirmComplete}>
                   OK
                 </button>
               </div>

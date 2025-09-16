@@ -3,7 +3,12 @@
     {
       "id": "018b",
       "title": "Lam viec a",
-      "completed": false
+      "completed": true
+    },
+    {
+      "id": "f223",
+      "title": "Lam viec c",
+      "completed": true
     }
   ]
 }
