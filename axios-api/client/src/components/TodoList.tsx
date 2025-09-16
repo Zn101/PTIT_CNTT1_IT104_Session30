@@ -22,6 +22,8 @@ export default function TodoList() {
   const [editTitle, setEditTitle] = useState("");
 
   const [filter, setFilter] = useState<"all" | "completed" | "active">("all");
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
 
   const loadTasks = async () => {
     try {
@@ -69,10 +71,16 @@ export default function TodoList() {
       setError("Tên công việc không được để trống!");
       return;
     }
+
+    if (tasks.some((t) => t.title.toLowerCase() === newTask.trim().toLowerCase())) {
+      setError("Công việc này đã tồn tại!");
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await axios.post(`http://localhost:3000/tasks`, {
-        title: newTask,
+        title: newTask.trim(),
         completed: false,
       });
       setTasks([...tasks, response.data]);
@@ -84,15 +92,15 @@ export default function TodoList() {
       setLoading(false);
     }
   };
-
-  const toggleTask = async (task: Task) => {
+  
+  const uncheckTask = async (task: Task) => {
     try {
       setLoading(true);
-      const updatedTask = { ...task, completed: !task.completed };
+      const updatedTask = { ...task, completed: false };
       await axios.put(`http://localhost:3000/tasks/${task.id}`, updatedTask);
-      setTasks(tasks.map((t) => (t.id === task.id ? updatedTask : t)));
-    } catch (error) {
-      console.log("Toggle task failed:", error);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+    } catch (err) {
+      console.log("Uncheck failed:", err);
     } finally {
       setLoading(false);
     }
@@ -104,11 +112,45 @@ export default function TodoList() {
     setShowEditModal(true);
   };
 
+  const confirmComplete = async () => {
+  if (!taskToComplete) return;
+  try {
+    setLoading(true);
+    const updatedTask = { ...taskToComplete, completed: !taskToComplete.completed };
+    await axios.put(`http://localhost:3000/tasks/${taskToComplete.id}`, updatedTask);
+    setTasks(tasks.map((t) => (t.id === taskToComplete.id ? updatedTask : t)));
+  } catch (error) {
+    console.log("Complete task failed:", error);
+  } finally {
+    setShowCompleteModal(false);
+    setTaskToComplete(null);
+    setLoading(false);
+  }
+};
+
+
   const confirmEdit = async () => {
     if (!taskToEdit) return;
+
+    if (!editTitle.trim()) {
+      setEditError("Tên công việc không được để trống!");
+      return;
+    }
+
+    if (
+      tasks.some(
+        (t) =>
+          t.title.toLowerCase() === editTitle.trim().toLowerCase() &&
+          t.id !== taskToEdit.id
+      )
+    ) {
+      setEditError("Công việc này đã tồn tại!");
+      return;
+    }
+
     try {
       setLoading(true);
-      const updatedTask = { ...taskToEdit, title: editTitle };
+      const updatedTask = { ...taskToEdit, title: editTitle.trim() };
       await axios.put(`http://localhost:3000/tasks/${taskToEdit.id}`, updatedTask);
       setTasks(tasks.map((t) => (t.id === taskToEdit.id ? updatedTask : t)));
       setShowEditModal(false);
@@ -119,6 +161,7 @@ export default function TodoList() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadTasks();
@@ -198,7 +241,16 @@ export default function TodoList() {
                     className="form-check-input me-2"
                     type="checkbox"
                     checked={task.completed}
-                    onChange={() => toggleTask(task)}
+                    onChange={() => {
+                      if (!task.completed) {
+                        // only show modal when marking as completed
+                        setTaskToComplete(task);
+                        setShowCompleteModal(true);
+                      } else {
+                        // if currently completed and user unchecks -> update directly
+                        uncheckTask(task);
+                      }
+                    }}
                   />
                   {task.completed ? <s>{task.title}</s> : task.title}
                 </div>
@@ -347,6 +399,35 @@ export default function TodoList() {
                   }}
                 >
                   Lưu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCompleteModal && (
+        <div
+          className="modal fade show"
+          style={{ display: "block", background: "rgba(0,0,0,0.5)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-body text-center">
+                <p className="mb-0">Hoàn thành công việc</p>
+              </div>
+              <div className="modal-footer justify-content-center">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowCompleteModal(false);
+                    setTaskToComplete(null);
+                  }}
+                >
+                  Hủy
+                </button>
+                <button className="btn btn-success" onClick={confirmComplete}>
+                  OK
                 </button>
               </div>
             </div>
